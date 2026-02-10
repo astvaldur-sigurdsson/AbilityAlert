@@ -126,17 +126,17 @@ end
 -- Get spell duration from auras
 local function GetAuraDuration(unit, spellID)
     for i = 1, 40 do
-        local name, _, _, _, duration, expirationTime, _, _, _, id = UnitAura(unit, i, "HELPFUL")
-        if not name then break end
-        if id == spellID then
-            return duration, expirationTime
+        local auraData = C_UnitAuras.GetBuffDataByIndex(unit, i)
+        if not auraData then break end
+        if auraData.spellId == spellID then
+            return auraData.duration, auraData.expirationTime
         end
     end
     for i = 1, 40 do
-        local name, _, _, _, duration, expirationTime, _, _, _, id = UnitAura(unit, i, "HARMFUL")
-        if not name then break end
-        if id == spellID then
-            return duration, expirationTime
+        local auraData = C_UnitAuras.GetDebuffDataByIndex(unit, i)
+        if not auraData then break end
+        if auraData.spellId == spellID then
+            return auraData.duration, auraData.expirationTime
         end
     end
     return nil, nil
@@ -144,7 +144,7 @@ end
 
 -- Send expiration message
 local function SendExpirationMessage(spellID, targetName)
-    local spellName = GetSpellInfo(spellID)
+    local spellName = C_Spell.GetSpellName(spellID)
     local friendName = AbilityAlertDB.friendName
     local displayMode = AbilityAlertDB.displayMode
     
@@ -184,20 +184,20 @@ local function UpdateNameplateIcons(unitToken)
     -- Check for tracked auras on this unit
     local activeIcons = {}
     for i = 1, 40 do
-        local name, texture, count, _, duration, expirationTime, caster, _, _, spellID = UnitAura(unitToken, i, "HELPFUL")
-        if not name then break end
+        local auraData = C_UnitAuras.GetBuffDataByIndex(unitToken, i)
+        if not auraData then break end
         
-        if caster == "player" and AbilityAlertDB.abilities[spellID] then
-            table.insert(activeIcons, {spellID = spellID, texture = texture, expirationTime = expirationTime, duration = duration})
+        if auraData.sourceUnit == "player" and AbilityAlertDB.abilities[auraData.spellId] then
+            table.insert(activeIcons, {spellID = auraData.spellId, texture = auraData.icon, expirationTime = auraData.expirationTime, duration = auraData.duration})
         end
     end
     
     for i = 1, 40 do
-        local name, texture, count, _, duration, expirationTime, caster, _, _, spellID = UnitAura(unitToken, i, "HARMFUL")
-        if not name then break end
+        local auraData = C_UnitAuras.GetDebuffDataByIndex(unitToken, i)
+        if not auraData then break end
         
-        if caster == "player" and AbilityAlertDB.abilities[spellID] then
-            table.insert(activeIcons, {spellID = spellID, texture = texture, expirationTime = expirationTime, duration = duration})
+        if auraData.sourceUnit == "player" and AbilityAlertDB.abilities[auraData.spellId] then
+            table.insert(activeIcons, {spellID = auraData.spellId, texture = auraData.icon, expirationTime = auraData.expirationTime, duration = auraData.duration})
         end
     end
     
@@ -442,21 +442,31 @@ end
 -- Get all spells from player's spellbook
 local function GetPlayerSpells()
     local spells = {}
-    local i = 1
     
-    while true do
-        local spellName, _, spellID = GetSpellBookItemName(i, BOOKTYPE_SPELL)
-        if not spellName then break end
+    -- Get all skill line indices
+    for skillLineIndex = 1, C_SpellBook.GetNumSpellBookSkillLines() do
+        local skillLineInfo = C_SpellBook.GetSpellBookSkillLineInfo(skillLineIndex)
         
-        local spellType = GetSpellBookItemInfo(i, BOOKTYPE_SPELL)
-        if spellType ~= "FUTURESPELL" and spellType ~= "FLYOUT" and spellID then
-            local texture = GetSpellTexture(spellID)
-            if texture then
-                table.insert(spells, {id = spellID, name = spellName, texture = texture})
+        -- Skip general tab and pet tab - only get class/spec abilities
+        if skillLineInfo and skillLineInfo.name then
+            local lowerName = string.lower(skillLineInfo.name)
+            -- Skip "General" and pet-related tabs
+            if not (lowerName == "general" or lowerName:find("pet") or skillLineInfo.shouldHide) then
+                -- Iterate through spells in this skill line
+                for i = skillLineInfo.itemIndexOffset + 1, skillLineInfo.itemIndexOffset + skillLineInfo.numSpellBookItems do
+                    local spellBookItemInfo = C_SpellBook.GetSpellBookItemInfo(i, Enum.SpellBookSpellBank.Player)
+                    
+                    if spellBookItemInfo and spellBookItemInfo.itemType == Enum.SpellBookItemType.Spell then
+                        local spellID = spellBookItemInfo.actionID
+                        local spellName = C_SpellBook.GetSpellBookItemName(i, Enum.SpellBookSpellBank.Player)
+                        local texture = C_Spell.GetSpellTexture(spellID)
+                        if texture and spellName and spellID then
+                            table.insert(spells, {id = spellID, name = spellName, texture = texture})
+                        end
+                    end
+                end
             end
         end
-        
-        i = i + 1
     end
     
     return spells
@@ -772,7 +782,7 @@ SlashCmdList["ABILITYALERT"] = function(msg)
         print("|cff00ff00AbilityAlert:|r Tracked abilities:")
         local count = 0
         for spellID in pairs(AbilityAlertDB.abilities) do
-            local name = GetSpellInfo(spellID)
+            local name = C_Spell.GetSpellName(spellID)
             print("  - " .. (name or "Unknown") .. " (ID: " .. spellID .. ")")
             count = count + 1
         end

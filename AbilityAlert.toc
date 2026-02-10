@@ -1,4 +1,4 @@
-## Interface: 110200
+## Interface: 120000
 ## Title: AbilityAlert
 ## Notes: Alerts your friend when you use specific abilities
 ## Author: astvaldur-sigurdsson
