@@ -1,7 +1,7 @@
-## Interface: 110002
+## Interface: 110200
 ## Title: AbilityAlert
 ## Notes: Alerts your friend when you use specific abilities
-## Author: YourName
+## Author: astvaldur-sigurdsson
 ## Version: 1.0
 ## SavedVariables: AbilityAlertDB
 
