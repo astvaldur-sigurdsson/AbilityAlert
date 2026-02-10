@@ -1,0 +1,8 @@
+## Interface: 110002
+## Title: AbilityAlert
+## Notes: Alerts your friend when you use specific abilities
+## Author: YourName
+## Version: 1.0
+## SavedVariables: AbilityAlertDB
+
+AbilityAlert.lua
